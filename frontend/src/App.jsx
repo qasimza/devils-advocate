@@ -11,6 +11,7 @@ export default function App() {
   const [partials, setPartials] = useState({})        // { speaker: accumulated_text }
   const [claims, setClaims] = useState([]) // { classification, summary, strength }[]
   const [report, setReport] = useState(null)
+  const [consentGiven, setConsentGiven] = useState(false)
 
   const socketRef = useRef(null)
   const mediaRecorderRef = useRef(null)
@@ -103,6 +104,7 @@ export default function App() {
     setTranscript([])
     setPartials({})
     setClaims([])
+    setConsentGiven(false)
     micStartedRef.current = false    // add this
     audioQueueRef.current = []       // add this — clear any leftover audio
     isProcessingAudioRef.current = false  // add this
@@ -242,6 +244,13 @@ export default function App() {
     }
     return buffer
   }
+
+  function handleConsentToggle() {
+    const newVal = !consentGiven
+    setConsentGiven(newVal)
+    socketRef.current?.emit('set_consent', { consent: newVal })
+  }
+
   return (
     <div style={{ display: 'flex', gap: 24, maxWidth: 1100, margin: '40px auto', padding: '0 20px' }}>
 
@@ -329,6 +338,40 @@ export default function App() {
                 ))}
               </div>
             )}
+            {/* ── Consent toggle ── */}
+            <div style={{
+              marginTop: 24, padding: '12px 16px',
+              background: '#111', border: '1px solid #222',
+              borderRadius: 8, display: 'flex',
+              alignItems: 'center', justifyContent: 'space-between', gap: 16
+            }}>
+              <div>
+                <p style={{ margin: 0, fontSize: 13, color: '#ccc', fontWeight: 600 }}>
+                  Share session data for research
+                </p>
+                <p style={{ margin: '2px 0 0', fontSize: 11, color: '#555', lineHeight: 1.4 }}>
+                  Anonymized transcript and scores used for academic study only.
+                  Off by default. You can change this any time before ending.
+                </p>
+              </div>
+              <button
+                onClick={handleConsentToggle}
+                style={{
+                  flexShrink: 0,
+                  width: 44, height: 24, borderRadius: 12,
+                  border: 'none', cursor: 'pointer',
+                  background: consentGiven ? '#4ade80' : '#333',
+                  position: 'relative', transition: 'background 0.2s'
+                }}
+              >
+                <span style={{
+                  position: 'absolute', top: 3,
+                  left: consentGiven ? 22 : 3,
+                  width: 18, height: 18, borderRadius: '50%',
+                  background: 'white', transition: 'left 0.2s'
+                }} />
+              </button>
+            </div>
             <button
               onClick={endDebate}
               style={{

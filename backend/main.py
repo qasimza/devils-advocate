@@ -15,6 +15,7 @@ from report import generate_report
 
 from validation import sanitize_claim, validate_audio_chunk, validate_participant_id
 from rate_limiter import limiter
+from firebase_logger import SessionLogger
 
 
 load_dotenv()
@@ -81,6 +82,11 @@ async def start_session(sid, data):
     state = SessionState(user_claim=claim)
     system_prompt = build_system_prompt(claim)
 
+    logger = SessionLogger(
+        session_id=state.session_id,
+        user_claim=claim
+    )
+
     # Define callbacks that emit back to this socket
     async def on_audio(audio_b64):
         await sio.emit('agent_audio', audio_b64, to=sid)
@@ -91,6 +97,7 @@ async def start_session(sid, data):
         else:
             state.add_turn('agent', text)
             await sio.emit('transcript', {'speaker': 'agent', 'text': text}, to=sid)
+            logger.log_turn('agent', text, state.turn_count)
 
     async def on_user_text(text, partial=False):
         if partial:
@@ -98,10 +105,12 @@ async def start_session(sid, data):
         else:
             state.add_turn('user', text)
             await sio.emit('transcript', {'speaker': 'user', 'text': text}, to=sid)
+            logger.log_turn('user', text, state.turn_count)
             # Fire claim classification in background (don't await — non-blocking)
             async def on_claim_result(result):
                 state.add_claim_event(text, result)
                 await sio.emit('claim_update', result, to=sid)
+                logger.log_claim_event(result)
             asyncio.create_task(classify_turn(
                 original_claim=state.user_claim,
                 context=state.get_recent_context(n=6),
@@ -114,6 +123,7 @@ async def start_session(sid, data):
     
     async def on_interrupted():
         await sio.emit('agent_interrupted', to=sid)
+        logger.log_interruption() 
 
     gemini = GeminiLiveClient(
         system_prompt=system_prompt,
@@ -136,7 +146,7 @@ async def start_session(sid, data):
 
     rag.ingest_documents(participant_id, texts=[], metadatas=[])
 
-    sessions[sid] = {'gemini': gemini, 'state': state, 'participant_id': participant_id}
+    sessions[sid] = {'gemini': gemini, 'state': state, 'participant_id': participant_id, 'logger': logger, 'consent': False}
     await sio.emit('session_ready', to=sid)
 
 @sio.event
@@ -181,9 +191,19 @@ async def end_session(sid):
     report = await generate_report(state)
     if report:
         await sio.emit('debate_report', report, to=sid)
+        session['logger'].log_report(report) 
+    
+    session['logger'].finalize(consent_given=session['consent'])
 
     await sio.disconnect(sid)  # disconnect AFTER report is sent
     print(f"Session ended. Turns: {len(state.turns)}")
+
+@sio.event
+async def set_consent(sid, data):
+    if sid not in sessions:
+        return
+    sessions[sid]['consent'] = data.get('consent', False)
+    print(f"Consent updated for {sid}: {sessions[sid]['consent']}")
 
 # ── Run ────────────────────────────────────────────────────────────
 if __name__ == "__main__":
