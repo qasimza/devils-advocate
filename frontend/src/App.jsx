@@ -10,6 +10,7 @@ export default function App() {
   const [isAgentSpeaking, setIsAgentSpeaking] = useState(false)
   const [partials, setPartials] = useState({})        // { speaker: accumulated_text }
   const [claims, setClaims] = useState([]) // { classification, summary, strength }[]
+  const [report, setReport] = useState(null)
 
   const socketRef = useRef(null)
   const mediaRecorderRef = useRef(null)
@@ -24,6 +25,7 @@ export default function App() {
   const isProcessingAudioRef = useRef(false)
 
   const transcriptEndRef = useRef(null)
+  const activeSourcesRef = useRef([])
 
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -73,6 +75,20 @@ export default function App() {
         streamRef.current.getTracks().forEach(t => t.stop())
       }
     })
+
+    socketRef.current.on('debate_report', (data) => {
+      setReport(data)
+    })
+
+    socketRef.current.on('agent_interrupted', () => {
+      console.log('interrupted fired')
+      interruptAgent()
+    })
+
+    socketRef.current.on('error', ({ message }) => {
+      console.error('Server error:', message)
+      alert(message)  // or render inline — up to you
+    })
   }
 
   // ── Start a debate session ──────────────────────────────────────
@@ -83,8 +99,13 @@ export default function App() {
     }
     await audioContextRef.current.resume()
     setStatus('connecting')
+    setReport(null)
     setTranscript([])
     setPartials({})
+    setClaims([])
+    micStartedRef.current = false    // add this
+    audioQueueRef.current = []       // add this — clear any leftover audio
+    isProcessingAudioRef.current = false  // add this
     connectSocket()
     socketRef.current.emit('start_session', { claim })
   }
@@ -130,9 +151,9 @@ export default function App() {
       const workletNode = new AudioWorkletNode(micContext, 'pcm-processor')
 
       workletNode.port.onmessage = (e) => {
-        if (!isAgentSpeakingRef.current) {  // don't send while agent speaks
-          socketRef.current?.emit('audio_chunk', e.data)
-        }
+
+        socketRef.current?.emit('audio_chunk', e.data)
+
       }
 
       source.connect(workletNode)
@@ -144,82 +165,12 @@ export default function App() {
   }
 
   // ── Play audio response from agent ─────────────────────────────
-  /*
-  async function playAudioChunk(base64Audio) {
-    const ctx = audioContextRef.current
-    if (!ctx) return
-
-    isAgentSpeakingRef.current = true
-    setIsAgentSpeaking(true)
-
-    // Clear any pending "speaking done" timer
-    if (speakingTimerRef.current) {
-      clearTimeout(speakingTimerRef.current)
-    }
-
-    const response = await fetch(`data:application/octet-stream;base64,${base64Audio}`)
-    const arrayBuffer = await response.arrayBuffer()
-
-    const samples = arrayBuffer.byteLength / 2
-    const float32 = new Float32Array(samples)
-    const view = new DataView(arrayBuffer)
-    for (let i = 0; i < samples; i++) {
-      float32[i] = view.getInt16(i * 2, true) / 32768.0
-    }
-
-    const buffer = ctx.createBuffer(1, samples, 24000)
-    buffer.copyToChannel(float32, 0)
-    const source = ctx.createBufferSource()
-    source.buffer = buffer
-    source.connect(ctx.destination)
-
-    const startTime = Math.max(ctx.currentTime, nextAudioTimeRef.current)
-    source.start(startTime)
-    nextAudioTimeRef.current = startTime + buffer.duration
-
-    // After 500ms of no new chunks arriving, mark speaking as done
-    const endDelay = (nextAudioTimeRef.current - ctx.currentTime + 0.5) * 1000
-    speakingTimerRef.current = setTimeout(() => {
-      isAgentSpeakingRef.current = false
-      setIsAgentSpeaking(false)
-      nextAudioTimeRef.current = 0
-    }, endDelay)
-  }
-  */
-
-
   function playAudioChunk(base64Audio) {
-    audioQueueRef.current.push(base64Audio)
-    if (!isProcessingAudioRef.current) processAudioQueue()
-  }
-
-
-  async function processAudioQueue() {
-    isProcessingAudioRef.current = true
-    while (audioQueueRef.current.length > 0) {
-      const base64Audio = audioQueueRef.current.shift()
-      await processAndPlayChunk(base64Audio)
-    }
-    isProcessingAudioRef.current = false
-    // All chunks done — open mic
-    if (speakingTimerRef.current) clearTimeout(speakingTimerRef.current)
-    isAgentSpeakingRef.current = false
-    setIsAgentSpeaking(false)
-    nextAudioTimeRef.current = 0
-  }
-
-  async function processAndPlayChunk(base64Audio) {
     const ctx = audioContextRef.current
     if (!ctx) return
 
-    isAgentSpeakingRef.current = true
-    setIsAgentSpeaking(true)
-
-    // Direct decode — avoids fetch/blob corruption
-    const binary = atob(base64Audio)
-    const bytes = new Uint8Array(binary.length)
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-
+    // Decode immediately — don't queue, schedule directly on the audio timeline
+    const bytes = Uint8Array.from(atob(base64Audio), c => c.charCodeAt(0))
     const samples = bytes.length / 2
     const float32 = new Float32Array(samples)
     const view = new DataView(bytes.buffer)
@@ -233,14 +184,29 @@ export default function App() {
     source.buffer = buffer
     source.connect(ctx.destination)
 
+    // Schedule back-to-back with no gap — this is the key fix
     const startTime = Math.max(ctx.currentTime, nextAudioTimeRef.current)
     source.start(startTime)
     nextAudioTimeRef.current = startTime + buffer.duration
 
-    await new Promise(resolve => {
-      source.onended = resolve
-      setTimeout(resolve, (buffer.duration + 0.1) * 1000)
-    })
+    // Track active sources so we can kill them on interruption
+    activeSourcesRef.current.push(source)
+    source.onended = () => {
+      activeSourcesRef.current = activeSourcesRef.current.filter(s => s !== source)
+    }
+
+    // Mark speaking
+    isAgentSpeakingRef.current = true
+    setIsAgentSpeaking(true)
+
+    // Reset the "done speaking" timer on every new chunk
+    if (speakingTimerRef.current) clearTimeout(speakingTimerRef.current)
+    const endDelay = (nextAudioTimeRef.current - ctx.currentTime + 0.3) * 1000
+    speakingTimerRef.current = setTimeout(() => {
+      isAgentSpeakingRef.current = false
+      setIsAgentSpeaking(false)
+      nextAudioTimeRef.current = 0
+    }, endDelay)
   }
 
   // ── End session ─────────────────────────────────────────────────
@@ -250,7 +216,20 @@ export default function App() {
     if (speakingTimerRef.current) clearTimeout(speakingTimerRef.current)
     streamRef.current?.getTracks().forEach(t => t.stop())
     socketRef.current?.emit('end_session')
-    socketRef.current?.disconnect()
+    //socketRef.current?.disconnect()
+  }
+
+  function interruptAgent() {
+    // Stop all scheduled audio immediately
+    activeSourcesRef.current.forEach(source => {
+      try { source.stop() } catch { }
+    })
+    activeSourcesRef.current = []
+    nextAudioTimeRef.current = 0
+
+    if (speakingTimerRef.current) clearTimeout(speakingTimerRef.current)
+    isAgentSpeakingRef.current = false
+    setIsAgentSpeaking(false)
   }
 
   // ── Utility: convert float32 audio to 16-bit PCM ───────────────
@@ -365,13 +344,92 @@ export default function App() {
 
         {status === 'ended' && (
           <div>
-            <p style={{ color: '#4ade80' }}>Debate ended.</p>
+            <p style={{ color: '#4ade80', marginBottom: 16 }}>Debate ended.</p>
+
+            {report ? (
+              <div style={{ background: '#111', borderRadius: 10, border: '1px solid #222', padding: 24 }}>
+
+                {/* Score + verdict */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
+                  <div style={{
+                    width: 64, height: 64, borderRadius: '50%', flexShrink: 0,
+                    background: report.overall_score >= 7 ? '#052e16' : report.overall_score >= 4 ? '#1a1a2e' : '#2d1010',
+                    border: `2px solid ${report.overall_score >= 7 ? '#4ade80' : report.overall_score >= 4 ? '#60a5fa' : '#e63946'}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 22, fontWeight: 700,
+                    color: report.overall_score >= 7 ? '#4ade80' : report.overall_score >= 4 ? '#60a5fa' : '#e63946'
+                  }}>
+                    {report.overall_score}
+                  </div>
+                  <p style={{ color: '#ccc', fontSize: 15, lineHeight: 1.5, margin: 0 }}>
+                    {report.verdict}
+                  </p>
+                </div>
+
+                {/* Strengths */}
+                <div style={{ marginBottom: 16 }}>
+                  <h3 style={{ fontSize: 11, color: '#4ade80', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+                    Strengths
+                  </h3>
+                  {report.strengths.map((s, i) => (
+                    <p key={i} style={{ color: '#aaa', fontSize: 13, lineHeight: 1.5, marginBottom: 4 }}>
+                      ✓ {s}
+                    </p>
+                  ))}
+                </div>
+
+                {/* Weaknesses */}
+                <div style={{ marginBottom: 16 }}>
+                  <h3 style={{ fontSize: 11, color: '#e63946', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+                    Weaknesses
+                  </h3>
+                  {report.weaknesses.map((w, i) => (
+                    <p key={i} style={{ color: '#aaa', fontSize: 13, lineHeight: 1.5, marginBottom: 4 }}>
+                      ✗ {w}
+                    </p>
+                  ))}
+                </div>
+
+                {/* Sharpest moment + biggest gap */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                  <div style={{ background: '#1a1a1a', borderRadius: 8, padding: 12 }}>
+                    <h3 style={{ fontSize: 10, color: '#60a5fa', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>
+                      Best Moment
+                    </h3>
+                    <p style={{ color: '#aaa', fontSize: 12, lineHeight: 1.5, margin: 0 }}>
+                      {report.sharpest_moment}
+                    </p>
+                  </div>
+                  <div style={{ background: '#1a1a1a', borderRadius: 8, padding: 12 }}>
+                    <h3 style={{ fontSize: 10, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>
+                      Biggest Gap
+                    </h3>
+                    <p style={{ color: '#aaa', fontSize: 12, lineHeight: 1.5, margin: 0 }}>
+                      {report.biggest_gap}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Recommendation */}
+                <div style={{ background: '#0f1f0f', border: '1px solid #1a3a1a', borderRadius: 8, padding: 12 }}>
+                  <h3 style={{ fontSize: 10, color: '#4ade80', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>
+                    Next Steps
+                  </h3>
+                  <p style={{ color: '#aaa', fontSize: 13, lineHeight: 1.5, margin: 0 }}>
+                    {report.recommendation}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <p style={{ color: '#555', fontSize: 13 }}>Generating report...</p>
+            )}
+
             <button
-              onClick={() => { setStatus('idle'); setClaim('') }}
+              onClick={() => { setStatus('idle'); setClaim(''); setReport(null) }}
               style={{
-                padding: '10px 24px', background: '#333',
-                color: 'white', border: 'none',
-                borderRadius: 8, fontSize: 15, cursor: 'pointer'
+                marginTop: 16, padding: '10px 24px', background: '#333',
+                color: 'white', border: 'none', borderRadius: 8,
+                fontSize: 15, cursor: 'pointer'
               }}
             >
               Start New Debate
