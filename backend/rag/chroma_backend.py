@@ -19,13 +19,14 @@ _BASE_METAS: list[dict] = []
 def _load_base_knowledge():
     global _BASE_CHUNKS, _BASE_METAS
     for filepath in glob.glob(os.path.join(KNOWLEDGE_DIR, "*.txt")):
-        with open(filepath) as f:
+        with open(filepath, encoding='utf-8', errors='ignore') as f:
             text = f.read()
         words = text.split()
         chunks = [" ".join(words[i:i+300]) for i in range(0, len(words), 250)]
-        for j, chunk in enumerate(chunks):
-            if chunk.strip():
-                _BASE_CHUNKS.append(chunk)
+        for chunk in chunks:
+            clean = chunk.encode('utf-8', errors='ignore').decode('utf-8').replace('\x00', '').strip()
+            if clean:
+                _BASE_CHUNKS.append(clean)
                 _BASE_METAS.append({"source": os.path.basename(filepath), "type": "base"})
     print(f"[RAG] Loaded {len(_BASE_CHUNKS)} base knowledge chunks")
 
@@ -44,13 +45,38 @@ class ChromaBackend(RAGBackend):
     def ingest_documents(self, participant_id: str, texts: list[str], metadatas: list[dict]) -> None:
         collection = self._get_collection(participant_id)
 
-        # Always seed with base knowledge + participant-specific docs
         all_texts = _BASE_CHUNKS + texts
         all_metas = _BASE_METAS + metadatas
         all_ids = [f"base_{i}" for i in range(len(_BASE_CHUNKS))] + \
-                  [f"user_{i}" for i in range(len(texts))]
+                [f"user_{i}" for i in range(len(texts))]
 
-        collection.upsert(documents=all_texts, ids=all_ids, metadatas=all_metas)
+        clean = []
+        clean_metas = []
+        clean_ids = []
+
+        for t, m, i in zip(all_texts, all_metas, all_ids):
+            try:
+                # Force a clean native Python str through encode/decode
+                # This strips null bytes and fixes any str subclass issues
+                clean_t = t.encode('utf-8', errors='ignore').decode('utf-8').replace('\x00', '').strip()
+                if clean_t:
+                    clean.append(clean_t)
+                    clean_metas.append(m)
+                    clean_ids.append(i)
+            except Exception as e:
+                print(f"[Chroma] Skipping bad doc id={i}: {e}")
+                continue
+
+        if not clean:
+            print("[Chroma] No valid documents after cleaning — skipping upsert")
+            return
+
+        print(f"[Chroma] Upserting {len(clean)} docs")
+        collection.upsert(
+            documents=clean,
+            ids=clean_ids,
+            metadatas=clean_metas
+        )
 
     def retrieve(self, participant_id: str, query: str, n_results: int = 3) -> str:
         collection = self._get_collection(participant_id)

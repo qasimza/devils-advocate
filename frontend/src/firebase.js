@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth, signInAnonymously, signInWithPopup, GoogleAuthProvider, GithubAuthProvider, onAuthStateChanged, signOut } from 'firebase/auth'
-import { getStorage } from 'firebase/storage'
+import { getStorage, ref, uploadBytesResumable, deleteObject, listAll, getMetadata } from 'firebase/storage'
+
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -17,5 +18,6 @@ export const auth = getAuth(app)
 export const storage = getStorage(app)
 export const googleProvider = new GoogleAuthProvider()
 export const githubProvider = new GithubAuthProvider()
+export { ref, uploadBytesResumable, deleteObject, listAll, getMetadata }
 
 export { signInAnonymously, signInWithPopup, onAuthStateChanged, signOut }

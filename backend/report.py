@@ -139,9 +139,19 @@ TRANSCRIPT:
                 max_output_tokens=500,
             )
         )
-        result = json.loads(response.text)
+        
+        raw = response.text.strip()
+        print(f"[Judge] Raw response: {raw[:200]}")  # log first 200 chars
+        
+        # Strip markdown fences if model ignored response_mime_type
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+            raw = raw.strip()
 
-        # Safety net: compute overall if model skipped it
+        result = json.loads(raw)
+
         if not result.get("overall"):
             scores = result.get("scores", {})
             if scores:
@@ -150,4 +160,5 @@ TRANSCRIPT:
         return result
     except Exception as e:
         print(f"Judge error: {e}")
+        print(f"[Judge] Full response text: {response.text if response else 'no response'}")
         return None

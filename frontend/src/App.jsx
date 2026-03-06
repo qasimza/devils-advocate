@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { io } from 'socket.io-client'
 import { auth, googleProvider, githubProvider, signInAnonymously, signInWithPopup, onAuthStateChanged, signOut } from './firebase'
+import { useDocumentUpload } from './useDocumentUpload'
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
 
@@ -18,11 +19,10 @@ export default function App() {
   const [user, setUser] = useState(null)       // null = not yet resolved
   const [authReady, setAuthReady] = useState(false)
 
+  const { uploadedFiles, uploading, loadingFiles, uploadFile, removeFile, clearAllFiles } = useDocumentUpload(user, status === 'debating')
 
-
+  const fileInputRef = useRef(null)
   const reportRef = useRef(null)
-
-
   const socketRef = useRef(null)
   const mediaRecorderRef = useRef(null)
   const audioContextRef = useRef(null)
@@ -161,7 +161,7 @@ export default function App() {
     audioQueueRef.current = []       // add this — clear any leftover audio
     isProcessingAudioRef.current = false  // add this
     connectSocket()
-    socketRef.current.emit('start_session', { claim, uid: user.uid, isAnonymous: user.isAnonymous })
+    socketRef.current.emit('start_session', { claim, uid: user.uid, isAnonymous: user.isAnonymous, documentPaths: uploadedFiles.map(f => f.path) })
   }
 
   // ── Mic capture and streaming ───────────────────────────────────
@@ -357,6 +357,82 @@ export default function App() {
     socketRef.current?.emit('set_consent', { consent: newVal })
   }
 
+  const knowledgeBasePanel = authReady && user && (
+    <div style={{ marginTop: 16 }}>
+      <h3 style={{ fontSize: 11, color: '#555', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+        Your Knowledge Base
+      </h3>
+
+      {/* Upload drop zone — only shown outside debate */}
+      {status !== 'debating' && (
+        <div
+          style={{
+            border: '1px dashed #333', borderRadius: 8,
+            padding: 16, textAlign: 'center', marginBottom: 8,
+            cursor: 'pointer', background: '#0d0d0d'
+          }}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.txt"
+            multiple
+            style={{ display: 'none' }}
+            onChange={e => {
+              Array.from(e.target.files).forEach(uploadFile)
+              e.target.value = ''
+            }}
+          />
+          <p style={{ margin: 0, color: '#555', fontSize: 13 }}>
+            {uploading ? 'Uploading...' : '+ Add pitch deck, business plan, or notes (PDF or .txt)'}
+          </p>
+        </div>
+      )}
+
+      {/* File list */}
+      {loadingFiles ? (
+        <p style={{ color: '#444', fontSize: 12 }}>Loading documents...</p>
+      ) : uploadedFiles.length === 0 ? (
+        <p style={{ color: '#444', fontSize: 12 }}>No documents uploaded yet.</p>
+      ) : (
+        uploadedFiles.map((f, i) => (
+          <div key={i} style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            padding: '6px 10px', marginBottom: 4,
+            background: '#1a1a1a', borderRadius: 6
+          }}>
+            <span style={{ fontSize: 12, color: '#aaa' }}>
+              📄 {f.name}
+              <span style={{ color: '#444', marginLeft: 6 }}>
+                ({(f.size / 1024).toFixed(0)}KB)
+              </span>
+            </span>
+            {/* Delete only allowed outside debate */}
+            {status !== 'debating' && (
+              <button
+                onClick={() => removeFile(f.path)}
+                style={{
+                  background: 'none', border: 'none',
+                  color: '#555', cursor: 'pointer', fontSize: 14,
+                  padding: '0 4px'
+                }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        ))
+      )}
+
+      {user?.isAnonymous && status !== 'debating' && uploadedFiles.length > 0 && (
+        <p style={{ fontSize: 11, color: '#444', marginTop: 6 }}>
+          Guest uploads are deleted when your session ends.
+        </p>
+      )}
+    </div>
+  )
+
   return (
     <div style={{ display: 'flex', gap: 24, maxWidth: 1100, margin: '40px auto', padding: '0 20px' }}>
 
@@ -435,17 +511,31 @@ export default function App() {
                 resize: 'vertical', boxSizing: 'border-box'
               }}
             />
-            <button
-              onClick={startDebate}
-              style={{
-                marginTop: 12, padding: '12px 28px',
-                background: '#e63946', color: 'white',
-                border: 'none', borderRadius: 8,
-                fontSize: 16, cursor: 'pointer'
-              }}
-            >
-              Start Debate
-            </button>
+            {knowledgeBasePanel}
+            <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
+              <button
+                onClick={startDebate}
+                style={{
+                  padding: '12px 28px', background: '#e63946',
+                  color: 'white', border: 'none', borderRadius: 8,
+                  fontSize: 16, cursor: 'pointer'
+                }}
+              >
+                Start Debate
+              </button>
+              {(judgeResult || report) && (
+                <button
+                  onClick={exportToPDF}
+                  style={{
+                    padding: '10px 24px', background: '#1a1a2e',
+                    color: '#60a5fa', border: '1px solid #60a5fa',
+                    borderRadius: 8, fontSize: 15, cursor: 'pointer'
+                  }}
+                >
+                  Export PDF
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -453,9 +543,22 @@ export default function App() {
 
         {status === 'debating' && (
           <div>
+            {/* Business idea display */}
+            <div style={{
+              background: '#0a0a0a', border: '1px solid #222',
+              borderRadius: 8, padding: 12, marginBottom: 16
+            }}>
+              <h3 style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>
+                Your Position
+              </h3>
+              <p style={{ color: '#ccc', fontSize: 14, lineHeight: 1.6, margin: 0 }}>
+                {claim}
+              </p>
+            </div>
             {isAgentSpeaking && (
               <p style={{ color: '#e63946', fontStyle: 'italic' }}>Agent is speaking...</p>
             )}
+            {knowledgeBasePanel}
             {/* ── Argument Tracker ── */}
             {claims.length > 0 && (
               <div style={{ marginTop: 24 }}>
@@ -725,7 +828,7 @@ export default function App() {
                   fontSize: 15, cursor: 'pointer'
                 }}
               >
-                Start New Debate
+                Clear (New Debate)
               </button>
             </div>
           </div>

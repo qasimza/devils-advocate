@@ -16,6 +16,7 @@ from report import generate_report, run_judge
 from validation import sanitize_claim, validate_audio_chunk, validate_participant_id
 from rate_limiter import limiter
 from firebase_logger import SessionLogger
+from storage_utils import download_and_extract, delete_user_files
 
 
 load_dotenv()
@@ -81,6 +82,7 @@ async def start_session(sid, data):
     uid = data.get('uid', sid)
     is_anonymous = data.get('isAnonymous', True)
     participant_id = uid  # uid is already validated by Firebase on the frontend
+    document_paths = data.get('documentPaths', [])
 
     print(f"Starting session for {sid}, uid: {uid}, anonymous: {is_anonymous}, claim: {claim}")
 
@@ -89,7 +91,9 @@ async def start_session(sid, data):
 
     logger = SessionLogger(
         session_id=state.session_id,
-        user_claim=claim
+        user_claim=claim,
+        uid=uid,
+        is_anonymous=is_anonymous
     )
 
     async def on_audio(audio_b64):
@@ -146,13 +150,22 @@ async def start_session(sid, data):
         turn_complete=True
     )
 
-    rag.ingest_documents(participant_id, texts=[], metadatas=[])
+    # Download and embed user's uploaded documents if any
+    doc_texts, doc_metas = [], []
+    if document_paths:
+        doc_texts, doc_metas = await asyncio.get_event_loop().run_in_executor(
+            None, download_and_extract, document_paths
+        )
+        print(f"[Session] Ingesting {len(doc_texts)} user document chunks for {uid}")
+
+    rag.ingest_documents(participant_id, texts=doc_texts, metadatas=doc_metas)
 
     sessions[sid] = {
         'gemini': gemini,
         'state': state,
         'participant_id': participant_id,
         'is_anonymous': is_anonymous,
+        'document_paths': document_paths,
         'logger': logger,
         'consent': True,  # default to True until user explicitly updates it
     }
@@ -196,6 +209,12 @@ async def end_session(sid):
         return
 
     rag.delete_participant(session['participant_id'])
+
+    # Delete uploaded files for anonymous users
+    if session.get('is_anonymous'):
+        await asyncio.get_event_loop().run_in_executor(
+            None, delete_user_files, session['participant_id']
+        )
     await session['gemini'].close()
     state = session['state']
 
