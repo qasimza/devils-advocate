@@ -32,10 +32,9 @@ export default function App() {
   const micStartedRef = useRef(false)
   const speakingTimerRef = useRef(null)
   const isPausedRef = useRef(false)
-
+  const micContextRef = useRef(null)
   const audioQueueRef = useRef([])
   const isProcessingAudioRef = useRef(false)
-
   const transcriptEndRef = useRef(null)
   const activeSourcesRef = useRef([])
 
@@ -161,7 +160,8 @@ export default function App() {
     audioQueueRef.current = []       // add this — clear any leftover audio
     isProcessingAudioRef.current = false  // add this
     connectSocket()
-    socketRef.current.emit('start_session', { claim, uid: user.uid, isAnonymous: user.isAnonymous, documentPaths: uploadedFiles.map(f => f.path) })
+    const idToken = await user.getIdToken()
+    socketRef.current.emit('start_session', { claim, idToken, isAnonymous: user.isAnonymous, documentPaths: uploadedFiles.map(f => f.path) })
   }
 
   // ── Mic capture and streaming ───────────────────────────────────
@@ -176,7 +176,8 @@ export default function App() {
       })
       streamRef.current = stream
 
-      const micContext = new AudioContext({ sampleRate: 16000 })
+      micContextRef.current = new AudioContext({ sampleRate: 16000 })
+      const micContext = micContextRef.current
 
       const workletCode = `
         class PCMProcessor extends AudioWorkletProcessor {
@@ -325,6 +326,14 @@ export default function App() {
     streamRef.current?.getTracks().forEach(t => t.stop())
     socketRef.current?.emit('end_session')
     //socketRef.current?.disconnect()
+    if (audioContextRef.current) {
+      audioContextRef.current.close()
+      audioContextRef.current = null
+    }
+    if (micContextRef.current) {
+      micContextRef.current.close()
+      micContextRef.current = null
+    }
   }
 
   function interruptAgent() {

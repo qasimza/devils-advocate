@@ -28,7 +28,7 @@ Return ONLY valid JSON, no markdown, no preamble:
     "market_logic": 0,
     "execution_risk": 0,
     "competitive_awareness": 0,
-    "internal_coherence": 0,
+    "internal_coherence": 0
   },
   "overall": 0,
   "winner": "founder",
@@ -117,6 +117,7 @@ strengths and weaknesses must each have at least 2 items and no more than 4.
 
 
 async def run_judge(state) -> dict | None:
+    response = None
     transcript_text = "\n".join(
         f"{t.speaker.upper()}: {t.text}" for t in state.turns
     )

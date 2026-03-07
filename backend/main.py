@@ -17,7 +17,11 @@ from validation import sanitize_claim, validate_audio_chunk, validate_participan
 from rate_limiter import limiter
 from firebase_logger import SessionLogger
 from storage_utils import download_and_extract, delete_user_files
+from firebase_admin import auth as fb_auth
 
+import time
+
+MAX_SESSION_DURATION = 20 * 60  # 20 minutes
 
 load_dotenv()
 
@@ -78,10 +82,22 @@ async def start_session(sid, data):
     except ValueError as e:
         await sio.emit('error', {'message': str(e)}, to=sid)
         return
+    
 
-    uid = data.get('uid', sid)
-    is_anonymous = data.get('isAnonymous', True)
-    participant_id = uid  # uid is already validated by Firebase on the frontend
+    id_token = data.get('idToken', '')
+    try:
+        decoded = fb_auth.verify_id_token(id_token)
+        uid = decoded['uid']
+        is_anonymous = decoded.get('firebase', {}).get('sign_in_provider') == 'anonymous'
+    except Exception:
+        await sio.emit('error', {'message': 'Authentication failed.'}, to=sid)
+        return
+    #participant_id = uid  # uid is already validated by Firebase on the frontend
+    try:
+        participant_id = validate_participant_id(uid)
+    except ValueError as e:
+        await sio.emit('error', {'message': 'Invalid session identity.'}, to=sid)
+        return
     document_paths = data.get('documentPaths', [])
 
     print(f"Starting session for {sid}, uid: {uid}, anonymous: {is_anonymous}, claim: {claim}")
@@ -167,6 +183,7 @@ async def start_session(sid, data):
         'is_anonymous': is_anonymous,
         'document_paths': document_paths,
         'logger': logger,
+        'started_at': time.time(),
         'consent': True,  # default to True until user explicitly updates it
     }
     await sio.emit('session_ready', to=sid)
@@ -185,6 +202,13 @@ async def audio_chunk(sid, data):
         return  # silently drop bad chunks
 
     session = sessions[sid]
+
+    if time.time() - session['started_at'] > MAX_SESSION_DURATION:
+        await sio.emit('error', {'message': 'Session time limit reached.'}, to=sid)
+        await end_session(sid)
+        return
+
+
     gemini = session['gemini']
     if not gemini.running:
         print(f"Dropping chunk — gemini not running for {sid}")
@@ -195,7 +219,7 @@ async def audio_chunk(sid, data):
     if last_retrieval.get(sid) != current_turn and current_turn > 0:
         last_retrieval[sid] = current_turn
         recent = session['state'].get_recent_context(n=2)
-        rag_context = rag.retrieve(session['participant_id'], recent, n_results=3)
+        rag_context = rag.retrieve(session['participant_id'], recent, n_results=5)
         if rag_context:
             msg = build_rag_context(rag_context)
             await gemini.send_context(msg)
