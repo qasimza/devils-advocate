@@ -120,7 +120,7 @@ export default function App() {
 
   const {
     status, transcript, partials, claims, report, judgeResult,
-    isAgentSpeaking, isPaused, consentGiven, sessionStatus, micVolume,
+    isAgentSpeaking, isPaused, consentGiven, sessionStatus, micVolume, reportReady,
     startDebate, endDebate, resetSession, togglePause,
     handleConsentToggle, exportToPDF,
   } = useDebateSession()
@@ -626,7 +626,12 @@ export default function App() {
                 )}
 
                 {/* Debate report */}
-                {report ? (
+                {!reportReady ? (
+                  <div style={{ ...card, display: 'flex', alignItems: 'center', gap: spacing.md }}>
+                    <Spinner />
+                    <span style={{ ...mono, color: colors.textFaint }}>Generating report...</span>
+                  </div>
+                ) : report ? (
                   <div style={{ ...card }}>
 
                     {report.idea_summary && (
@@ -723,14 +728,13 @@ export default function App() {
                     </div>
                   </div>
                 ) : (
-                  <div style={{
-                    ...card, display: 'flex',
-                    alignItems: 'center', gap: spacing.md,
-                  }}>
-                    <Spinner />
-                    <span style={{ ...mono, color: colors.textFaint }}>Generating report...</span>
+                  <div style={{ ...card }}>
+                    <span style={{ ...mono, color: colors.textFaint }}>
+                      Session too short — no report generated.
+                    </span>
                   </div>
                 )}
+
               </div>
 
               <div style={{ display: 'flex', gap: spacing.md, marginTop: spacing.lg }}>

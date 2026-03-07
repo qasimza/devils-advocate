@@ -42,6 +42,7 @@ export function useDebateSession() {
     const [consentGiven, setConsentGiven] = useState(true)
     const [sessionStatus, setSessionStatus] = useState('')
     const [micVolume, setMicVolume] = useState(0)  // 0-1 float
+    const [reportReady, setReportReady] = useState(false)
 
     // ── Refs ───────────────────────────────────────────────────────
     const socketRef = useRef(null)
@@ -58,7 +59,9 @@ export function useDebateSession() {
 
     // ── Socket setup ───────────────────────────────────────────────
     function connectSocket() {
-        socketRef.current = io(BACKEND_URL)
+        socketRef.current = io(BACKEND_URL, {
+            transports: ['websocket'],
+        })
 
         socketRef.current.on('transcript', ({ speaker, text }) => {
             setTranscript(prev => [...prev, { speaker, text }])
@@ -101,7 +104,10 @@ export function useDebateSession() {
         })
 
         socketRef.current.on('debate_report', (data) => {
-            setReport(data)
+            setReport(data)  // null is fine, UI handles it
+            setReportReady(true)
+            setStatus('ended')
+            streamRef.current?.getTracks().forEach(t => t.stop())
         })
 
         socketRef.current.on('agent_interrupted', () => {
@@ -131,6 +137,7 @@ export function useDebateSession() {
         setTranscript([])
         setPartials({})
         setClaims([])
+        setReportReady(false)
         setConsentGiven(true)
         setJudgeResult(null)
         micStartedRef.current = false
@@ -166,6 +173,7 @@ export function useDebateSession() {
     function resetSession() {
         setStatus('idle')
         setReport(null)
+        setReportReady(false)
         setJudgeResult(null)
         setTranscript([])
         setPartials({})
@@ -342,6 +350,7 @@ export function useDebateSession() {
         consentGiven,
         sessionStatus,
         micVolume,
+        reportReady,
         // actions
         startDebate,
         endDebate,

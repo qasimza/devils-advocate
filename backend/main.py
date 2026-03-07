@@ -33,19 +33,22 @@ sio = socketio.AsyncServer(
     cors_allowed_origins=[
         'https://devils-advocate-ec48b.web.app',
         'https://devils-advocate-ec48b.firebaseapp.com',
+        'https://devils-advocate-488918.web.app',
         'http://localhost:5173'
     ]
 )
 socket_app = socketio.ASGIApp(sio, app)
 
 app.add_middleware(CORSMiddleware,
-    cors_allowed_origins=[
+    allow_origins=[
         'https://devils-advocate-ec48b.web.app',
         'https://devils-advocate-ec48b.firebaseapp.com',
+        'https://devils-advocate-488918.web.app',
         'http://localhost:5173'
     ],
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
+    allow_credentials=True,
 )
 
 # ── Active sessions store ──────────────────────────────────────────
