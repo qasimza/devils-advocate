@@ -226,7 +226,7 @@ export default function LandingPage({ onEnter }) {
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
-                    <span style={{ fontSize: 18 }}>😈</span>
+                    <span style={{ fontSize: 24 }}>👹</span>
                     <span style={{
                         fontFamily: "'Bebas Neue', 'Georgia', serif",
                         fontSize: font.xl, letterSpacing: 3,

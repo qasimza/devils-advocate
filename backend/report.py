@@ -16,6 +16,9 @@ You will receive a full transcript of the debate. Score the FOUNDER (not the AI)
 4. competitive_awareness (1-10): How well did they handle questions about competition and differentiation?
 5. internal_coherence (1-10): Were their arguments consistent and logically sound throughout?
 
+If the transcript contains fewer than 2 substantive exchanges, return all scores as 0
+and set summary to "Insufficient debate content to evaluate."
+
 Also determine:
 - overall: average of the five scores, rounded to 1 decimal
 - winner: "founder" if overall >= 6, "agent" if < 6
@@ -38,6 +41,8 @@ Return ONLY valid JSON, no markdown, no preamble:
 
 
 async def generate_report(state) -> dict | None:
+    if state.turn_count < 2:
+        return None
     transcript = state.get_recent_context(n=100)
     claim_summary = "\n".join([
         f"- [{e.classification}] {e.summary} (strength: {e.strength}/10)"
@@ -66,6 +71,9 @@ Generate a structured debrief. You MUST follow these rules:
 - The idea_summary should reflect what the idea EVOLVED into during the debate, not just the
   opening claim — founders often refine or pivot their framing mid-session.
 - sharpest_moment and biggest_gap must be grounded in something actually said, not inferred.
+
+If the transcript contains fewer than 2 substantive exchanges, return all scores as 0
+and set summary to "Insufficient debate content to evaluate."
 
 Respond ONLY with a JSON object in this exact format (no markdown, no extra keys):
 {{

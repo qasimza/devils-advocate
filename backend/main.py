@@ -22,6 +22,7 @@ from firebase_admin import auth as fb_auth
 import time
 
 MAX_SESSION_DURATION = 20 * 60  # 20 minutes
+MIN_TURNS_FOR_REPORT = 2  # require at least 2 user and 2 agent turns to generate report
 
 load_dotenv()
 
@@ -249,6 +250,12 @@ async def end_session(sid):
         )
     await session['gemini'].close()
     state = session['state']
+
+    if state.turn_count < MIN_TURNS_FOR_REPORT:
+        await sio.emit('debate_report', None, to=sid)
+        session['logger'].finalize(consent_given=session['consent'])
+        await sio.disconnect(sid)
+        return
 
     # Run judge and report concurrently
     judge_result, report = await asyncio.gather(
