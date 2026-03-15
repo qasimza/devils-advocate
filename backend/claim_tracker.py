@@ -38,7 +38,7 @@ Classify the user's latest turn as exactly ONE of:
 - NEW_CLAIM: User introduced a new aspect of their idea not previously discussed
 - DEFLECTED: User changed the subject to something else that was a part of the original claim or gave a non-answer
 
-TRENGTH SCORE (1–10):
+STRENGTH SCORE (1–10):
 Rate how compelling the turn is *given its classification*:
 
 - DEFENDED (1–10): Did the counter-argument actually neutralize the attack?
@@ -63,7 +63,9 @@ Rate how compelling the turn is *given its classification*:
   - 9–10: Seamless pivot to a genuinely strong topic, backed by clear and convincing reasoning
   - 6–8: Reasonably smooth pivot to a decent topic, but reasoning is underdeveloped or partially convincing
   - 3–5: Awkward pivot or weak topic choice, with thin or unconvincing reasoning
-  - 1–2: Jarring or transparent subject change, lands on a weak point with little to no supporting reasonin
+  - 1–2: Jarring or transparent subject change, lands on a weak point with little to no supporting reasoning
+
+- SUGGESTED ARGUMENT: Your suggested argument to the user to better defend their position in this turn should be 1-3 sentences. It should be a strong argument that improves teh users argument by providing additional evidence derived from the context or reasoning.
 """
 
 
