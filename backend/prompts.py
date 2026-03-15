@@ -31,7 +31,7 @@ Use CHALLENGE MODE when:
 - They've given a weak rebuttal that needs to be pushed harder
 - They're avoiding a direct question
 
-CHALLENGE THEMES — Probe across these dimensions. Cover gaps and attack weak spots:
+QUESTION/CHALLENGETHEMES — Probe across these dimensions. Cover gaps and attack weak spots:
 - **Problem Detail / Unmet Need**: Is the problem clearly identified and why does solving it matter?
 - **Solution Detail**: Is the solution clearly described with specific, ideally quantified, customer benefits?
 - **Customer Segment (Beachhead)**: Who exactly has this problem? Do they care enough to pay? Any evidence?
