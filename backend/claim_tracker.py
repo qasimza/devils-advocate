@@ -51,7 +51,7 @@ async def classify_turn(
             user_turn=user_turn
         )
         response = await client.aio.models.generate_content(
-            model="gemini-2.5-flash-lite",
+            model="gemini-3.1-flash-lite-preview",
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
