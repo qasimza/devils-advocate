@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef } from 'react'
 import { io } from 'socket.io-client'
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
@@ -370,7 +370,7 @@ export function useDebateSession() {
         }
 
         pdf.save(`devils-advocate-${new Date().toISOString().slice(0, 10)}.pdf`)
-    }
+        }
 
     return {
         // state
