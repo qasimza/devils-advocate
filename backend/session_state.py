@@ -16,6 +16,7 @@ class ClaimEvent:
     classification: str  # DEFENDED | CONCEDED | NEW_CLAIM | DEFLECTED
     summary: str
     strength: int
+    reason: str = ""
     timestamp: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
 @dataclass
@@ -47,6 +48,7 @@ class SessionState:
             classification=result.get("classification", ""),
             summary=result.get("summary", ""),
             strength=result.get("strength", 0),
+            reason=result.get("reason", ""),
         ))
 
     def to_dict(self) -> dict:
@@ -69,6 +71,7 @@ class SessionState:
                     "classification": c.classification,
                     "summary": c.summary,
                     "strength": c.strength,
+                    "reason": c.reason,
                     "timestamp": c.timestamp,
                 }
                 for c in self.claim_events
