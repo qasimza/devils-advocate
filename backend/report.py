@@ -145,7 +145,7 @@ TRANSCRIPT:
                 system_instruction=JUDGE_PROMPT,
                 response_mime_type="application/json",
                 temperature=0.2,
-                max_output_tokens=500,
+                max_output_tokens=1024,
             )
         )
         
