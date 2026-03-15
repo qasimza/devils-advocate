@@ -6,13 +6,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 VALID_RESULT = {
     "classification": "DEFENDED",
     "summary": "User cited specific CAC payback data to counter the agent's challenge",
-    "strength": 7
+    "strength": 7,
+    "reason": "User provided concrete data that directly addressed the agent's challenge",
 }
 
 CONCEDED_RESULT = {
     "classification": "CONCEDED",
     "summary": "User admitted they hadn't validated the market size assumption",
-    "strength": 2
+    "strength": 2,
+    "reason": "User acknowledged a gap without providing counter-evidence",
 }
 
 
@@ -131,7 +133,8 @@ class TestClassifyTurn:
             mock_response.text = json.dumps({
                 "classification": classification,
                 "summary": "test summary",
-                "strength": 5
+                "strength": 5,
+                "reason": "test reason",
             })
             mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
 

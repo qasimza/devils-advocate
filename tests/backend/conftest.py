@@ -23,7 +23,7 @@ def mock_genai_client(mock_gemini_response):
         mock_client_class.return_value = mock_client
         # Make aio.models.generate_content an async mock
         mock_client.aio.models.generate_content = AsyncMock(
-            return_value=mock_gemini_response('{"classification": "DEFENDED", "summary": "test", "strength": 7}')
+            return_value=mock_gemini_response('{"classification": "DEFENDED", "summary": "test", "strength": 7, "reason": "test reason"}')
         )
         yield mock_client
 
