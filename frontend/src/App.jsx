@@ -670,7 +670,7 @@ export default function App() {
                         {judgeResult.summary}
                       </p>
                     </div>
-                    <div style={{ marginTop: spacing.lg, borderTop: `1px solid ${colors.border}`, paddingTop: spacing.lg }}>
+                    <div data-pdf-hide style={{ marginTop: spacing.lg, borderTop: `1px solid ${colors.border}`, paddingTop: spacing.lg }}>
                       <button onClick={handleShare} style={{
                         padding: `8px 20px`,
                         background: 'transparent',
@@ -696,7 +696,9 @@ export default function App() {
                     <span style={{ ...mono, color: colors.textFaint }}>Generating report...</span>
                   </div>
                 ) : report ? (
-                  <div style={{ ...card }}>
+                  <>
+                  {/* Page 1: Scorecard context, idea, verdict, strengths, weaknesses */}
+                  <div style={{ ...card, marginBottom: spacing.lg }}>
 
                     {report.idea_summary && (
                       <div style={{
@@ -737,7 +739,7 @@ export default function App() {
                       ))}
                     </div>
 
-                    <div style={{ marginBottom: spacing.lg }}>
+                    <div>
                       <SectionLabel color={colors.accent}>Weaknesses</SectionLabel>
                       {report.weaknesses.map((w, i) => (
                         <div key={i} style={{
@@ -751,6 +753,10 @@ export default function App() {
                         </div>
                       ))}
                     </div>
+                  </div>
+
+                  {/* Page 2: Debate breakdown, best moment, biggest gap, next steps */}
+                  <div style={{ ...card }} data-pdf-page-break>
 
                     {report.claim_events?.length > 0 && (
                       <div style={{ marginBottom: spacing.lg }}>
@@ -836,6 +842,7 @@ export default function App() {
                       </p>
                     </div>
                   </div>
+                  </>
                 ) : (
                   <div style={{ ...card }}>
                     <span style={{ ...mono, color: colors.textFaint }}>

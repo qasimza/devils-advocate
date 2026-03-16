@@ -341,12 +341,18 @@ export function useDebateSession() {
         const { default: jsPDF } = await import('jspdf')
         const { default: html2canvas } = await import('html2canvas')
 
-        // Collect section boundaries before rendering to avoid a page break inside a section.
         const container = reportRef.current
-        const sectionBounds = Array.from(container.children).map(el => ({
-            top: el.offsetTop,
-            bottom: el.offsetTop + el.offsetHeight,
-        }))
+
+        // Hide elements not meant for PDF first, so layout reflects the exported state
+        const hiddenEls = Array.from(container.querySelectorAll('[data-pdf-hide]'))
+        hiddenEls.forEach(el => el.style.display = 'none')
+
+        // Measure forced break positions after hiding, so they match the canvas
+        const containerRect = container.getBoundingClientRect()
+        const forcedBreaksDom = Array.from(container.querySelectorAll('[data-pdf-page-break]'))
+            .map(el => el.getBoundingClientRect().top - containerRect.top)
+            .filter(pos => pos > 0)
+            .sort((a, b) => a - b)
 
         const canvas = await html2canvas(container, {
             backgroundColor: '#0d0d0d',
@@ -355,31 +361,32 @@ export function useDebateSession() {
             logging: false,
         })
 
-        const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: 'a4' })
+        hiddenEls.forEach(el => el.style.display = '')
+
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: 'letter' })
         const pageWidth = pdf.internal.pageSize.getWidth()
         const pageHeight = pdf.internal.pageSize.getHeight()
 
-        // Scale factor: how many canvas px equal one PDF px
         const domToCanvas = canvas.width / container.offsetWidth
-        // Page height expressed in canvas pixels
         const scaledPageH = pageHeight * (canvas.width / pageWidth)
 
-        // Build page break positions that never split a section
-        const breakPoints = []  // canvas-px positions where new pages start
+        const forcedBreaks = forcedBreaksDom
+            .map(pos => pos * domToCanvas)
+            .filter(pos => pos < canvas.height)
+
+        const breakPoints = []
         let cursor = 0
+        let forcedIdx = 0
+
         while (cursor + scaledPageH < canvas.height) {
-            let breakAt = cursor + scaledPageH
-            for (const s of sectionBounds) {
-                const sTop = s.top * domToCanvas
-                const sBot = s.bottom * domToCanvas
-                // If this section straddles the proposed break, move break up
-                if (sTop < breakAt && sBot > breakAt) {
-                    breakAt = sTop
-                    break
-                }
+            if (forcedIdx < forcedBreaks.length && forcedBreaks[forcedIdx] <= cursor + scaledPageH) {
+                breakPoints.push(forcedBreaks[forcedIdx])
+                cursor = forcedBreaks[forcedIdx]
+                forcedIdx++
+            } else {
+                breakPoints.push(cursor + scaledPageH)
+                cursor += scaledPageH
             }
-            breakPoints.push(breakAt)
-            cursor = breakAt
         }
 
         // Render each page slice onto a temporary canvas and add to PDF
@@ -399,11 +406,13 @@ export function useDebateSession() {
             const slicePdfH = sliceH * (pageWidth / canvas.width)
 
             if (i > 0) pdf.addPage()
+            pdf.setFillColor(13, 13, 13)
+            pdf.rect(0, 0, pageWidth, pageHeight, 'F')
             pdf.addImage(sliceImg, 'PNG', 0, 0, pageWidth, slicePdfH)
         }
 
         pdf.save(`devils-advocate-${new Date().toISOString().slice(0, 10)}.pdf`)
-        }
+    }
 
     return {
         // state
