@@ -424,7 +424,7 @@ export default function App() {
                 </PrimaryBtn>
                 {(judgeResult || report) && (
                   <GhostBtn
-                    onClick={() => exportToPDF(reportRef)}
+                    onClick={() => exportToPDF(reportRef, { report, claim })}
                     color={colors.info}
                   >Export PDF</GhostBtn>
                 )}
@@ -855,7 +855,7 @@ export default function App() {
 
               <div style={{ display: 'flex', gap: spacing.md, marginTop: spacing.lg }}>
                 {(judgeResult || report) && (
-                  <GhostBtn onClick={() => exportToPDF(reportRef)} color={colors.info}>
+                  <GhostBtn onClick={() => exportToPDF(reportRef, { report, claim })} color={colors.info}>
                     Export PDF
                   </GhostBtn>
                 )}

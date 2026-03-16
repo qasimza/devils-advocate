@@ -1,7 +1,11 @@
 import { useState, useRef } from 'react'
 import { io } from 'socket.io-client'
+import { colors, font } from '../theme'
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
+
+const LETTER_PX = { w: 612, h: 792 }
+const PDF_TITLE_PAGE_LINK = 'https://devils-advocate-488918.web.app/'
 
 /**
  * useDebateSession
@@ -336,10 +340,92 @@ export function useDebateSession() {
     }
 
     // ── PDF export ─────────────────────────────────────────────────
-    async function exportToPDF(reportRef) {
+    async function exportToPDF(reportRef, { report, claim } = {}) {
         if (!reportRef?.current) return
         const { default: jsPDF } = await import('jspdf')
         const { default: html2canvas } = await import('html2canvas')
+
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: 'letter' })
+        const pageWidth = pdf.internal.pageSize.getWidth()
+        const pageHeight = pdf.internal.pageSize.getHeight()
+
+        // Title page (page 1) when report is available — render as HTML so it uses site fonts
+        if (report) {
+            const dateStr = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
+            const titleEl = document.createElement('div')
+            titleEl.setAttribute('data-pdf-title-page', '')
+            Object.assign(titleEl.style, {
+                position: 'fixed',
+                left: '-9999px',
+                top: '0',
+                width: `${LETTER_PX.w}px`,
+                height: `${LETTER_PX.h}px`,
+                background: colors.bgDark,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '80px 48px',
+                boxSizing: 'border-box',
+                fontFamily: "'Georgia', 'Times New Roman', serif",
+            })
+            titleEl.innerHTML = `
+                <div style="
+                    font-family: 'Bebas Neue', Georgia, serif;
+                    font-size: 42px;
+                    letter-spacing: 2px;
+                    color: ${colors.accent};
+                    margin-bottom: 16px;
+                    text-align: center;
+                ">DEVIL'S ADVOCATE</div>
+                <div style="
+                    font-family: 'JetBrains Mono', monospace;
+                    font-size: 12px;
+                    letter-spacing: 2px;
+                    color: ${colors.textFaint};
+                    text-transform: uppercase;
+                    margin-bottom: 72px;
+                ">Pitch Defense Report</div>
+                <div style="
+                    font-family: 'JetBrains Mono', monospace;
+                    font-size: 11px;
+                    color: ${colors.textDim};
+                    margin-bottom: 48px;
+                ">${dateStr}</div>
+                <div style="
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 8px;
+                ">
+                    <span style="
+                        font-family: 'JetBrains Mono', monospace;
+                        font-size: 10px;
+                        letter-spacing: 1px;
+                        color: ${colors.textFaint};
+                    ">For more info:</span>
+                    <a href="${PDF_TITLE_PAGE_LINK}" style="
+                        font-family: 'JetBrains Mono', monospace;
+                        font-size: 11px;
+                        color: ${colors.accent};
+                        text-decoration: none;
+                        letter-spacing: 1px;
+                    ">${PDF_TITLE_PAGE_LINK}</a>
+                </div>
+            `
+            document.body.appendChild(titleEl)
+            const titleCanvas = await html2canvas(titleEl, {
+                backgroundColor: colors.bgDark,
+                scale: 2,
+                useCORS: true,
+                logging: false,
+            })
+            document.body.removeChild(titleEl)
+            const titleImg = titleCanvas.toDataURL('image/png')
+            const titlePdfH = titleCanvas.height * (pageWidth / titleCanvas.width)
+            pdf.addImage(titleImg, 'PNG', 0, 0, pageWidth, titlePdfH)
+            pdf.addPage()
+        }
 
         const container = reportRef.current
 
@@ -362,10 +448,6 @@ export function useDebateSession() {
         })
 
         hiddenEls.forEach(el => el.style.display = '')
-
-        const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: 'letter' })
-        const pageWidth = pdf.internal.pageSize.getWidth()
-        const pageHeight = pdf.internal.pageSize.getHeight()
 
         const domToCanvas = canvas.width / container.offsetWidth
         const scaledPageH = pageHeight * (canvas.width / pageWidth)
