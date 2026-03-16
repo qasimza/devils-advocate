@@ -210,7 +210,7 @@ export default function App() {
   }
   async function handleShare() {
     try {
-      await copyShareText({ claim, report, judgeResult })
+      await copyShareText({ claim, judgeResult })
       setShareStatus('copied')
       setTimeout(() => setShareStatus(null), 3000)
     } catch {

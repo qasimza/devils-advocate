@@ -21,7 +21,7 @@
 //
 //   Stress-test your idea → devils-advocate-488918.web.app
 
-export function buildShareText({ claim, report, judgeResult }) {
+export function buildShareText({ claim, judgeResult }) {
     const lines = []
 
     // ── Header ──
@@ -29,13 +29,13 @@ export function buildShareText({ claim, report, judgeResult }) {
     lines.push(`─────────────────────────────`)
 
     // ── Claim ──
-    const truncated = claim.length > 80 ? claim.slice(0, 77) + '...' : claim
+    const truncated = claim.length > 400 ? claim.slice(0, 397) + '...' : claim
     lines.push(`"${truncated}"`)
     lines.push(``)
 
     // ── Score bar (Wordle-style emoji blocks) ──
-    if (report) {
-        const score = report.overall_score  // 1–10
+    if (judgeResult) {
+        const score = judgeResult.overall  // 1–10
         const filled = Math.round(score)
         const empty = 10 - filled
 
@@ -102,8 +102,8 @@ export function buildShareText({ claim, report, judgeResult }) {
 // Builds the text and copies it to clipboard.
 // Returns 'copied' on success, throws on failure.
 
-export async function copyShareText({ claim, report, judgeResult }) {
-    const text = buildShareText({ claim, report, judgeResult })
+export async function copyShareText({ claim, judgeResult }) {
+    const text = buildShareText({ claim, judgeResult })
     await navigator.clipboard.writeText(text)
     return 'copied'
 }

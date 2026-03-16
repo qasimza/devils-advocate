@@ -78,6 +78,7 @@ async def connect(sid, environ):
 async def disconnect(sid, reason=None):
     print(f"Client disconnected: {sid}, reason: {reason}")
     limiter.clear_sid(sid)
+    last_retrieval.pop(sid, None)
     session = sessions.pop(sid, None)
     if session:
         rag.delete_participant(session['participant_id'])
@@ -421,6 +422,10 @@ async def extract_claim(request: Request):
 @app.get("/health")
 async def health():
     return {"ok": True}
+
+@app.on_event("startup")
+async def startup():
+    asyncio.create_task(limiter.periodic_cleanup())
 
 # ── Run ────────────────────────────────────────────────────────────
 if __name__ == "__main__":

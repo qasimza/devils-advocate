@@ -50,4 +50,12 @@ class RateLimiter:
         self._session_starts.pop(sid, None)
         self._audio_chunks.pop(sid, None)
 
+    async def periodic_cleanup(self):
+        while True:
+            await asyncio.sleep(300)  # every 5 minutes
+            for store in [self._connections, self._extract_claims,
+                        self._session_starts, self._audio_chunks]:
+                for k in [k for k, v in store.items() if not v]:
+                    del store[k]
+
 limiter = RateLimiter()
