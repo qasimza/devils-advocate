@@ -23,8 +23,8 @@ export const colors = {
     textPrimary: '#f0f0f0',
     textSecondary: '#eee',
     textMuted: '#ccc',
-    textDim: '#AAA',
-    textFaint: '#777',
+    textDim: '#c5c5c5',
+    textFaint: '#a7a7a7',
     textGhost: '#555',
 
     // Semantic surfaces (classification backgrounds)

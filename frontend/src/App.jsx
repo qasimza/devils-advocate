@@ -116,6 +116,84 @@ function GhostBtn({ onClick, children, color = colors.textFaint, borderColor, st
   )
 }
 
+function MicDictation({ onTranscript, onInterim }) {
+  const [listening, setListening] = useState(false)
+  const recognitionRef = useRef(null)
+
+  function toggleMic() {
+    if (listening) {
+      recognitionRef.current?.stop()
+      setListening(false)
+      onInterim('')
+      return
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      alert('Speech recognition is not supported in this browser. Try Chrome.')
+      return
+    }
+
+    const recognition = new SpeechRecognition()
+    recognition.continuous = true
+    recognition.interimResults = true
+    recognition.lang = 'en-US'
+
+    recognition.onresult = (e) => {
+      let interim = ''
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) {
+          onTranscript(e.results[i][0].transcript)
+          onInterim('')
+        } else {
+          interim += e.results[i][0].transcript
+        }
+      }
+      if (interim) onInterim(interim)
+    }
+
+    recognition.onend = () => { setListening(false); onInterim('') }
+    recognition.onerror = () => { setListening(false); onInterim('') }
+
+    recognition.start()
+    recognitionRef.current = recognition
+    setListening(true)
+  }
+
+  return (
+    <button
+      onClick={toggleMic}
+      title={listening ? 'Stop dictation' : 'Dictate your claim'}
+      style={{
+        background: listening ? `${colors.accent}20` : 'transparent',
+        border: `1px solid ${listening ? colors.accent : colors.borderSubtle}`,
+        borderRadius: radius.sm,
+        color: listening ? colors.accent : colors.textFaint,
+        cursor: 'pointer',
+        padding: `6px 10px`,
+        ...mono,
+        fontSize: 10,
+        display: 'flex', alignItems: 'center', gap: 6,
+        transition: 'all 0.2s ease',
+        flexShrink: 0,
+      }}
+    >
+      {listening ? (
+        <>
+          <div style={{
+            width: 8, height: 8, borderRadius: '50%',
+            background: colors.accent,
+            animation: 'pulse 1s ease-out infinite',
+          }} />
+          Stop
+        </>
+      ) : (
+        <>🎤 Dictate</>
+      )}
+    </button>
+  )
+}
+
 // ── Main App ───────────────────────────────────────────────────
 export default function App() {
   const { user, authReady, signInWithGoogle, signInWithGitHub, handleSignOut } = useAuth()
@@ -137,6 +215,7 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(true)
   const [showLanding, setShowLanding] = useState(true)
   const [shareStatus, setShareStatus] = useState(null)
+  const [interimText, setInterimText] = useState('')
 
   const fileInputRef = useRef(null)
   const reportRef = useRef(null)
@@ -223,7 +302,9 @@ export default function App() {
   const knowledgeBasePanel = authReady && user && (
     <div style={{ marginTop: spacing.lg }}>
       <SectionLabel>Your Knowledge Base</SectionLabel>
-
+      <p style={{ ...serif, color: colors.textFaint, fontSize: font.sm, lineHeight: 1.5, margin: `0 0 ${spacing.md}px` }}>
+        Upload your deck, one-pager, or data — the agent will use it to challenge you with specifics from your own materials.
+      </p>
       {status !== 'debating' && (
         <div
           className="file-drop"
@@ -336,12 +417,19 @@ export default function App() {
         position: 'sticky', top: 0, zIndex: 10,
         background: colors.bgBase,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
-          <span>👹</span>
-          <span style={{ ...displayFont, fontSize: font.xl, letterSpacing: 3 }}>
+        <button
+          onClick={() => setShowLanding(true)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: spacing.md,
+            background: 'none', border: 'none', cursor: 'pointer',
+            padding: 0,
+          }}
+        >
+          <span style={{ fontSize: 24 }}>👹</span>
+          <span style={{ ...displayFont, fontSize: font.xl, letterSpacing: 3, color: colors.textPrimary }}>
             DEVIL'S ADVOCATE
           </span>
-        </div>
+        </button>
 
         {authReady && (
           <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
@@ -400,9 +488,11 @@ export default function App() {
               </p>
 
               <textarea
-                value={claim}
-                onChange={e => setClaim(e.target.value)}
-                placeholder="Describe your startup idea, business model, or hypothesis — or upload a pitch deck / business plan below."
+                value={interimText ? `${claim} ${interimText}` : claim}
+                onChange={e => {
+                  if (!interimText) setClaim(e.target.value)
+                }}
+                placeholder="e.g. We're building an app that helps independent restaurants manage reservations and reduce no-shows - without the high commission fees of existing booking platforms"
                 maxLength={CLAIM_CHARACTER_LIMIT}
                 rows={5}
                 style={{
@@ -426,13 +516,23 @@ export default function App() {
                 marginTop: spacing.sm,
                 color: colors.textFaint,
                 ...mono,
+                alignItems: 'center',
               }}>
                 <span>Typed claims: up to {CLAIM_CHARACTER_LIMIT} characters</span>
-                <span style={{
-                  color: claim.length >= CLAIM_CHARACTER_LIMIT ? colors.accent : colors.textFaint,
-                }}>
-                  {CLAIM_CHARACTER_LIMIT - claim.length} remaining
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
+                  <MicDictation
+                    onTranscript={(chunk) => setClaim(prev => {
+                      const joined = prev ? `${prev.trim()} ${chunk.trim()}` : chunk.trim()
+                      return joined.slice(0, CLAIM_CHARACTER_LIMIT)
+                    })}
+                    onInterim={setInterimText}
+                  />
+                  <span style={{
+                    color: claim.length >= CLAIM_CHARACTER_LIMIT ? colors.accent : colors.textFaint,
+                  }}>
+                    {CLAIM_CHARACTER_LIMIT - claim.length} remaining
+                  </span>
+                </div>
               </div>
 
               {knowledgeBasePanel}
@@ -561,38 +661,108 @@ export default function App() {
               )}
 
               {/* Consent toggle */}
-              <div style={{
-                ...card,
+              <button onClick={() => {
+                const label = document.getElementById('consent-label')
+                const scan = document.getElementById('consent-scan')
+                label?.classList.add('glitching')
+                scan?.classList.add('glitching')
+                setTimeout(() => {
+                  label?.classList.remove('glitching')
+                  scan?.classList.remove('glitching')
+                }, 300)
+                handleConsentToggle()
+              }} style={{
                 marginTop: spacing.xl,
                 padding: `${spacing.md}px ${spacing.lg}px`,
                 display: 'flex', alignItems: 'center',
                 justifyContent: 'space-between', gap: spacing.lg,
+                borderRadius: radius.md,
+                border: `1px solid ${consentGiven ? colors.success + '40' : colors.borderSubtle}`,
+                background: consentGiven ? `${colors.success}08` : 'transparent',
+                transition: 'background 0.3s ease, border-color 0.3s ease',
+                width: '100%', cursor: 'pointer', textAlign: 'left',
               }}>
-                <div>
-                  <p style={{ margin: 0, ...mono, color: colors.textSecondary }}>
-                    Share session data for research
-                  </p>
-                  <p style={{
-                    margin: '4px 0 0', fontSize: font.xs, color: colors.textFaint,
-                    ...serif, lineHeight: 1.4,
-                  }}>
-                    Anonymized transcript used for academic study only.
-                  </p>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: spacing.sm }}>
+                  <span style={{ fontSize: 14, marginTop: 1, flexShrink: 0 }}>
+                    {consentGiven ? '🔬' : '🔒'}
+                  </span>
+                  <div>
+                    <p style={{ margin: 0, ...mono, color: consentGiven ? colors.success : colors.textMuted }}>
+                      Share session data for research
+                    </p>
+                    <p style={{
+                      margin: '3px 0 0', fontSize: font.xs,
+                      color: colors.textGhost, ...serif, lineHeight: 1.4,
+                    }}>
+                      Anonymized transcript used for academic study only.
+                    </p>
+                  </div>
                 </div>
-                <button onClick={handleConsentToggle} style={{
-                  flexShrink: 0, width: 44, height: 24,
-                  borderRadius: radius.pill, border: 'none', cursor: 'pointer',
-                  background: consentGiven ? colors.success : colors.borderSubtle,
-                  position: 'relative', transition: 'background 0.2s',
+
+                <div style={{
+                  flexShrink: 0,
+                  border: `1px solid ${consentGiven ? colors.success : colors.accent}`,
+                  borderRadius: radius.sm,
+                  padding: `4px 10px`,
+                  position: 'relative',
+                  overflow: 'hidden',
+                  minWidth: 110,
+                  textAlign: 'center',
                 }}>
-                  <span style={{
-                    position: 'absolute', top: 3,
-                    left: consentGiven ? 22 : 3,
-                    width: 18, height: 18, borderRadius: '50%',
-                    background: 'white', transition: 'left 0.2s',
-                  }} />
-                </button>
-              </div>
+                  <style>{`
+                          @keyframes glitch-scan {
+                              0%   { transform: translateY(-100%); opacity: 0.6; }
+                              100% { transform: translateY(200%);  opacity: 0; }
+                          }
+                          @keyframes glitch-flicker {
+                              0%,100% { opacity: 1; }
+                              20%     { opacity: 0.2; }
+                              40%     { opacity: 1; }
+                              60%     { opacity: 0.4; }
+                              80%     { opacity: 1; }
+                          }
+                          .glitch-label { animation: none; }
+                          .glitch-label.glitching { animation: glitch-flicker 0.25s ease forwards; }
+                          .glitch-scan-line {
+                              position: absolute;
+                              left: 0; right: 0;
+                              height: 3px;
+                              background: ${consentGiven ? colors.success : colors.accent};
+                              opacity: 0;
+                              pointer-events: none;
+                          }
+                          .glitch-scan-line.glitching { animation: glitch-scan 0.25s ease forwards; }
+                      `}</style>
+
+                  <div className="glitch-scan-line" id="consent-scan" />
+                  <span
+                    id="consent-label"
+                    className="glitch-label"
+                    style={{
+                      ...mono,
+                      fontSize: 10,
+                      letterSpacing: 3,
+                      color: consentGiven ? colors.success : colors.accent,
+                      textDecoration: consentGiven ? 'none' : 'line-through',
+                      textDecorationColor: colors.accent,
+                      textDecorationThickness: 2,
+                      display: 'block',
+                      position: 'relative',
+                      zIndex: 1,
+                    }}
+                  >
+                    {consentGiven ? '[DECLASSIFIED]' : '[REDACTED]'}
+                  </span>
+                  {consentGiven && (
+                    <span style={{
+                      position: 'absolute',
+                      top: 0, left: 0, right: 0, bottom: 0,
+                      background: `${colors.success}10`,
+                      pointerEvents: 'none',
+                    }} />
+                  )}
+                </div>
+              </button>
 
               {/* Controls */}
               <div style={{ display: 'flex', gap: spacing.md, marginTop: spacing.lg }}>
@@ -603,9 +773,7 @@ export default function App() {
                 >
                   {isPaused ? '▶ Resume' : '⏸ Pause'}
                 </GhostBtn>
-                <PrimaryBtn onClick={endDebate}>
-                  END & EVALUATE
-                </PrimaryBtn>
+                <HoldToEndButton onConfirm={endDebate} />
               </div>
             </div>
           )}
@@ -710,9 +878,14 @@ export default function App() {
 
                 {/* Debate report */}
                 {!reportReady ? (
-                  <div style={{ ...card, display: 'flex', alignItems: 'center', gap: spacing.md }}>
-                    <Spinner />
-                    <span style={{ ...mono, color: colors.textFaint }}>Generating report...</span>
+                  <div style={{ ...card }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md, marginBottom: spacing.sm }}>
+                      <Spinner />
+                      <span style={{ ...mono, color: colors.textFaint }}>Generating report...</span>
+                    </div>
+                    <p style={{ ...serif, color: colors.textGhost, fontSize: font.sm, lineHeight: 1.5, margin: 0 }}>
+                      Analyzing your debate transcript — this usually takes about 30 seconds.
+                    </p>
                   </div>
                 ) : report ? (
                   <>

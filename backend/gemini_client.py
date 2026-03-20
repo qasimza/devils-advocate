@@ -101,6 +101,8 @@ class GeminiLiveClient:
                     if sc.grounding_metadata and self.on_grounding:
                         await self.on_grounding(sc.grounding_metadata)
                     if sc.interrupted:
+                        if agent_transcript_buffer.strip():
+                            await self.on_text(agent_transcript_buffer.strip(), partial=False)
                         agent_transcript_buffer = ""
                         user_transcript_buffer = ""
                         if self.on_interrupted:

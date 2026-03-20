@@ -13,12 +13,6 @@ const serif = {
     fontFamily: "'Georgia', 'Times New Roman', serif",
 }
 
-const card = {
-    background: colors.bgSurface,
-    border: `1px solid ${colors.border}`,
-    borderRadius: radius.lg,
-    padding: spacing.xl,
-}
 export function FeedbackWidget({ sessionId, uid, claim }) {
     const [isOpen, setIsOpen] = useState(false)
     const [rating, setRating] = useState(null)
@@ -51,20 +45,30 @@ export function FeedbackWidget({ sessionId, uid, claim }) {
     }
 
     return (
-        <div style={{ ...card, marginTop: spacing.lg }}>
+        <div style={{
+            marginTop: spacing.lg,
+            background: colors.bgSurfaceAlt,
+            border: `1px solid ${colors.borderSubtle}`,
+            borderTop: `2px solid ${colors.info}`,
+            borderRadius: radius.lg,
+            padding: spacing.lg,
+        }}>
             <button
                 onClick={() => setIsOpen(prev => !prev)}
                 style={{
-                    background: 'none', border: 'none', cursor: 'pointer',
+                    background: 'none', border: 'none', cursor: submitted ? 'default' : 'pointer',
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     width: '100%', padding: 0,
                 }}
             >
-                <span style={{ ...mono, color: submitted ? colors.success : colors.textFaint }}>
-                    {submitted ? '✓ Feedback submitted' : 'Leave feedback'}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+                    <span style={{ fontSize: 14 }}>{submitted ? '✓' : '💬'}</span>
+                    <span style={{ ...mono, color: submitted ? colors.success : colors.textMuted }}>
+                        {submitted ? 'Thanks for your feedback' : 'How was your experience?'}
+                    </span>
+                </div>
                 {!submitted && (
-                    <span style={{ ...mono, color: colors.textFaint }}>
+                    <span style={{ ...mono, color: colors.textFaint, fontSize: 10 }}>
                         {isOpen ? '▲' : '▼'}
                     </span>
                 )}
@@ -72,20 +76,25 @@ export function FeedbackWidget({ sessionId, uid, claim }) {
 
             {isOpen && !submitted && (
                 <div style={{ marginTop: spacing.md }}>
-                    <div style={{ ...mono, color: colors.textFaint, marginBottom: spacing.sm }}>
-                        Rate your experience
+                    <div style={{ height: 1, background: colors.border, marginBottom: spacing.md }} />
+
+                    <div style={{ ...mono, color: colors.textDim, marginBottom: spacing.sm }}>
+                        Rate this session
                     </div>
 
                     <div style={{ display: 'flex', gap: spacing.sm, marginBottom: spacing.md }}>
                         {[1, 2, 3, 4, 5].map(n => (
                             <button key={n} onClick={() => setRating(n)} style={{
-                                width: 36, height: 36,
+                                width: 40, height: 40,
                                 borderRadius: radius.sm,
-                                border: `1px solid ${rating === n ? colors.accent : colors.borderSubtle}`,
-                                background: rating === n ? `${colors.accent}20` : colors.bgSurfaceAlt,
-                                color: rating === n ? colors.accent : colors.textFaint,
+                                border: `1px solid ${rating === n ? colors.info : colors.border}`,
+                                background: rating === n ? `${colors.info}18` : colors.bgSurface,
+                                color: rating === n ? colors.info : colors.textDim,
                                 cursor: 'pointer',
-                                ...mono,
+                                fontFamily: "'JetBrains Mono', monospace",
+                                fontSize: font.md,
+                                fontWeight: rating === n ? 700 : 400,
+                                transition: 'all 0.15s ease',
                             }}>
                                 {n}
                             </button>
@@ -100,20 +109,22 @@ export function FeedbackWidget({ sessionId, uid, claim }) {
                         style={{
                             width: '100%',
                             padding: spacing.sm,
-                            background: colors.bgSurfaceAlt,
-                            border: `1px solid ${colors.borderSubtle}`,
+                            background: colors.bgSurface,
+                            border: `1px solid ${colors.border}`,
                             borderRadius: radius.sm,
-                            color: colors.textPrimary,
+                            color: colors.textMuted,
                             ...serif,
                             fontSize: font.sm,
+                            lineHeight: 1.5,
                             resize: 'none',
                             boxSizing: 'border-box',
                             marginBottom: spacing.md,
+                            outline: 'none',
                         }}
                     />
 
                     {error && (
-                        <p style={{ ...mono, color: colors.accent, marginBottom: spacing.sm }}>
+                        <p style={{ ...mono, color: colors.accent, marginBottom: spacing.sm, fontSize: 10 }}>
                             Submission failed — try again
                         </p>
                     )}
@@ -122,17 +133,18 @@ export function FeedbackWidget({ sessionId, uid, claim }) {
                         onClick={handleSubmit}
                         disabled={!rating || submitting}
                         style={{
-                            padding: `8px 18px`,
-                            background: 'transparent',
+                            padding: `8px 20px`,
+                            background: !rating || submitting ? 'transparent' : `${colors.info}18`,
                             color: !rating || submitting ? colors.textGhost : colors.info,
-                            border: `1px solid ${!rating || submitting ? colors.borderSubtle : colors.info}`,
+                            border: `1px solid ${!rating || submitting ? colors.border : colors.info}`,
                             borderRadius: radius.sm,
                             ...mono,
                             cursor: !rating || submitting ? 'default' : 'pointer',
                             opacity: !rating || submitting ? 0.5 : 1,
+                            transition: 'all 0.15s ease',
                         }}
                     >
-                        {submitting ? 'Submitting...' : 'Submit Feedback'}
+                        {submitting ? 'Submitting...' : 'Submit'}
                     </button>
                 </div>
             )}

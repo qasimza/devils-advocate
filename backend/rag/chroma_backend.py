@@ -78,7 +78,7 @@ class ChromaBackend(RAGBackend):
             metadatas=clean_metas
         )
 
-    def retrieve(self, participant_id: str, query: str, n_results: int = 3) -> str:
+    def retrieve(self, participant_id: str, query: str, n_results: int = 8) -> str:
         collection = self._get_collection(participant_id)
         results = collection.query(query_texts=[query], n_results=n_results)
         chunks = results.get("documents", [[]])[0]

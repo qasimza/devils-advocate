@@ -349,7 +349,7 @@ async def audio_chunk(sid, data):
     if last_retrieval.get(sid) != current_turn and current_turn > 0:
         last_retrieval[sid] = current_turn
         recent = session['state'].get_recent_context(n=2)
-        rag_context = rag.retrieve(session['participant_id'], recent, n_results=5)
+        rag_context = rag.retrieve(session['participant_id'], recent, n_results=8)
         if rag_context:
             msg = build_rag_context(rag_context)
             await gemini.send_context(msg)

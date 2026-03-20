@@ -8,7 +8,7 @@ class RAGBackend(ABC):
         pass
 
     @abstractmethod
-    def retrieve(self, participant_id: str, query: str, n_results: int = 3) -> str:
+    def retrieve(self, participant_id: str, query: str, n_results: int = 8) -> str:
         """Return top-n relevant chunks as a single string."""
         pass
 
