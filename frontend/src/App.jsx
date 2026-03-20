@@ -115,6 +115,89 @@ function GhostBtn({ onClick, children, color = colors.textFaint, borderColor, st
     </button>
   )
 }
+function HoldToEndButton({ onConfirm }) {
+  const [holding, setHolding] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const animFrameRef = useRef(null)
+  const startTimeRef = useRef(null)
+  const HOLD_DURATION = 1500
+
+  function startHold() {
+    setHolding(true)
+    startTimeRef.current = Date.now()
+
+    function tick() {
+      const elapsed = Date.now() - startTimeRef.current
+      const pct = Math.min(elapsed / HOLD_DURATION, 1)
+      setProgress(pct)
+      if (pct < 1) {
+        animFrameRef.current = requestAnimationFrame(tick)
+      } else {
+        onConfirm()
+        setHolding(false)
+        setProgress(0)
+      }
+    }
+    animFrameRef.current = requestAnimationFrame(tick)
+  }
+
+  function cancelHold() {
+    setHolding(false)
+    setProgress(0)
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
+  }
+
+  const bars = 12
+  return (
+    <button
+      onMouseDown={startHold}
+      onMouseUp={cancelHold}
+      onMouseLeave={cancelHold}
+      onTouchStart={startHold}
+      onTouchEnd={cancelHold}
+      style={{
+        display: 'flex', alignItems: 'center', gap: spacing.sm,
+        padding: `13px 30px`,
+        background: holding ? `${colors.accent}22` : colors.accent,
+        color: 'white', border: holding ? `1px solid ${colors.accent}` : 'none',
+        borderRadius: radius.md,
+        ...displayFont, fontSize: font.xl, letterSpacing: 2,
+        cursor: 'pointer',
+        boxShadow: holding ? 'none' : '0 4px 20px rgba(230,57,70,0.2)',
+        transition: 'background 0.1s ease, box-shadow 0.1s ease',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        minWidth: 200,
+      }}
+    >
+      {holding ? (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+            {Array.from({ length: bars }).map((_, i) => {
+              const threshold = i / bars
+              const active = progress > threshold
+              const height = active ? 8 + Math.sin((i / bars) * Math.PI) * 12 : 3
+              return (
+                <div key={i} style={{
+                  width: 3, borderRadius: 2,
+                  height: `${height}px`,
+                  background: active ? 'white' : 'rgba(255,255,255,0.3)',
+                  transition: 'height 0.05s ease',
+                }} />
+              )
+            })}
+          </div>
+          <span>ENDING...</span>
+        </>
+      ) : (
+        <>
+          <span>⏹</span>
+          <span>END & EVALUATE</span>
+        </>
+      )}
+    </button>
+  )
+}
 
 function MicDictation({ onTranscript, onInterim }) {
   const [listening, setListening] = useState(false)
