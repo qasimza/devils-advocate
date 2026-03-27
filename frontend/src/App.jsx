@@ -84,7 +84,7 @@ function PrimaryBtn({ onClick, children, style = {} }) {
       style={{
         display: 'flex', alignItems: 'center', gap: spacing.sm,
         padding: `13px 30px`,
-        background: colors.accent, color: 'white', border: 'none',
+        background: colors.accent, color: 'white', border: '1px solid transparent',
         borderRadius: radius.md,
         ...displayFont, fontSize: font.xl, letterSpacing: 2,
         cursor: 'pointer',
@@ -246,6 +246,7 @@ function MicDictation({ onTranscript, onInterim }) {
   return (
     <button
       onClick={toggleMic}
+      className="da-btn"
       title={listening ? 'Stop dictation' : 'Dictate your claim'}
       style={{
         background: listening ? `${colors.accent}20` : 'transparent',
@@ -300,6 +301,8 @@ export default function App() {
   const [showLanding, setShowLanding] = useState(true)
   const [shareStatus, setShareStatus] = useState(null)
   const [interimText, setInterimText] = useState('')
+  const [hoveredStage, setHoveredStage] = useState(null)
+  const [pressedStage, setPressedStage] = useState(null)
 
   const fileInputRef = useRef(null)
   const reportRef = useRef(null)
@@ -385,8 +388,10 @@ export default function App() {
   // ── Knowledge base panel ───────────────────────────────────────
   const knowledgeBasePanel = authReady && user && (
     <div style={{ marginTop: spacing.lg }}>
-      <SectionLabel>Your Knowledge Base</SectionLabel>
-      <p style={{ ...serif, color: colors.textFaint, fontSize: font.sm, lineHeight: 1.5, margin: `0 0 ${spacing.md}px` }}>
+      <div style={{ ...mono, color: colors.textPrimary, fontSize: font.sm, letterSpacing: 2, textTransform: 'uppercase', marginBottom: spacing.sm }}>
+        Your Knowledge Base
+      </div>
+      <p style={{ ...serif, color: colors.textMuted, fontSize: font.xs, lineHeight: 1.5, margin: `0 0 ${spacing.md}px` }}>
         Upload your deck, one-pager, or data — the agent will use it to challenge you with specifics from your own materials.
       </p>
       {status !== 'debating' && (
@@ -488,7 +493,7 @@ export default function App() {
         @keyframes pulse  { 0% { transform:scale(1); opacity:0.8; } 100% { transform:scale(2.5); opacity:0; } }
         ${conversationKeyframes}
         .da-btn { transition: all 0.15s ease; cursor: pointer; }
-        .da-btn:hover { opacity: 0.82; transform: translateY(-1px); }
+        .da-btn:hover { opacity: 0.82; transform: translateY(-1px); border-color: ${colors.accent} !important; }
         .file-drop:hover { border-color: ${colors.accent} !important; }
         textarea:focus { border-color: ${colors.accent} !important; outline: none; }
       `}</style>
@@ -567,9 +572,22 @@ export default function App() {
                   big idea?
                 </span>
               </h1>
-              <p style={{ ...mono, color: colors.textFaint, marginBottom: spacing.xl }}>
+              <p style={{ ...mono, color: colors.textPrimary, lineHeight: 1.6, marginBottom: spacing.lg }}>
                 State your position or upload documents below — the Devil's Advocate will do the rest.
               </p>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm }}>
+                <span style={{ ...mono, color: colors.textFaint, fontSize: font.xs }}>
+                  Prefer to speak it out?
+                </span>
+                <MicDictation
+                  onTranscript={(chunk) => setClaim(prev => {
+                    const joined = prev ? `${prev.trim()} ${chunk.trim()}` : chunk.trim()
+                    return joined.slice(0, CLAIM_CHARACTER_LIMIT)
+                  })}
+                  onInterim={setInterimText}
+                />
+              </div>
 
               <textarea
                 value={interimText ? `${claim} ${interimText}` : claim}
@@ -593,70 +611,101 @@ export default function App() {
                   transition: 'border-color 0.2s',
                 }}
               />
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                gap: spacing.md,
-                marginTop: spacing.sm,
-                color: colors.textFaint,
-                ...mono,
-                alignItems: 'center',
-              }}>
-                <span>Typed claims: up to {CLAIM_CHARACTER_LIMIT} characters</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
-                  <MicDictation
-                    onTranscript={(chunk) => setClaim(prev => {
-                      const joined = prev ? `${prev.trim()} ${chunk.trim()}` : chunk.trim()
-                      return joined.slice(0, CLAIM_CHARACTER_LIMIT)
-                    })}
-                    onInterim={setInterimText}
-                  />
-                  <span style={{
-                    color: claim.length >= CLAIM_CHARACTER_LIMIT ? colors.accent : colors.textFaint,
-                  }}>
-                    {CLAIM_CHARACTER_LIMIT - claim.length} remaining
-                  </span>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: spacing.sm }}>
+                <span style={{ ...mono, fontSize: font.xs, color: claim.length >= CLAIM_CHARACTER_LIMIT ? colors.accent : colors.textGhost }}>
+                  {CLAIM_CHARACTER_LIMIT - claim.length} remaining
+                </span>
+              </div>
+
+              {/* ── Stage toggle ───────────────────────────────── */}
+              <div style={{ marginTop: spacing.md }}>
+                <div style={{ ...mono, color: colors.textPrimary, fontSize: font.sm, letterSpacing: 2, marginBottom: 4 }}>
+                  WHAT STAGE IS YOUR IDEA?
+                </div>
+                <p style={{ ...serif, color: colors.textFaint, fontSize: font.xs, margin: `0 0 ${spacing.sm}px` }}>
+                  This shapes how your opponent debates you.
+                </p>
+                {/* Segmented control container */}
+                <div style={{
+                  position: 'relative',
+                  display: 'flex',
+                  background: colors.bgSurfaceAlt,
+                  border: `1px solid ${hoveredStage !== null ? colors.accent : colors.border}`,
+                  borderRadius: 10,
+                  padding: 3,
+                  transition: 'border-color 0.15s ease',
+                }}>
+                  {/* Sliding pill */}
+                  <div style={{
+                    position: 'absolute',
+                    top: 3,
+                    left: 3,
+                    width: 'calc(50% - 3px)',
+                    height: 'calc(100% - 6px)',
+                    borderRadius: 8,
+                    background: colors.accent,
+                    boxShadow: '0 0 14px rgba(230,57,70,0.35)',
+                    transition: 'transform 0.1s ease',
+                    transform: stage === 'late' ? 'translateX(100%)' : 'translateX(0)',
+                    pointerEvents: 'none',
+                  }} />
+                  {[
+                    { value: 'early', label: "I'm exploring an idea" },
+                    { value: 'late',  label: "I have traction & data" },
+                  ].map(({ value, label }) => {
+                    const active = stage === value
+                    const hovered = hoveredStage === value
+                    const pressed = pressedStage === value
+                    return (
+                      <button
+                        key={value}
+                        onClick={() => setStage(value)}
+                        onMouseEnter={() => setHoveredStage(value)}
+                        onMouseLeave={() => { setHoveredStage(null); setPressedStage(null) }}
+                        onMouseDown={() => setPressedStage(value)}
+                        onMouseUp={() => setPressedStage(null)}
+                        style={{
+                          flex: 1,
+                          position: 'relative',
+                          zIndex: 1,
+                          padding: '10px 16px',
+                          background: (!active && hovered) ? 'rgba(255,255,255,0.04)' : 'transparent',
+                          border: 'none',
+                          borderRadius: 7,
+                          color: active ? '#fff' : 'rgba(167,167,167,0.65)',
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          transition: 'color 0.2s ease, background 0.15s ease, transform 0.1s ease',
+                          transform: (!active && pressed) ? 'scale(0.97)' : 'scale(1)',
+                          ...mono,
+                          fontSize: '0.72rem',
+                          letterSpacing: 1,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
+                {/* Dynamic helper text */}
+                <div style={{
+                  ...mono,
+                  fontSize: '0.6rem',
+                  color: colors.textGhost,
+                  marginTop: spacing.sm,
+                  transition: 'opacity 0.2s ease',
+                  opacity: 0.8,
+                }}>
+                  {stage === 'early'
+                    ? "Challenge assumptions and uncover blind spots."
+                    : "Stress-test metrics, scalability, and risks."}
                 </div>
               </div>
 
               {knowledgeBasePanel}
 
-              {/* ── Stage toggle ───────────────────────────────── */}
-              <div style={{ marginTop: spacing.lg }}>
-                <div style={{ ...mono, color: colors.textFaint, marginBottom: spacing.sm }}>
-                  IDEA STAGE
-                </div>
-                <div style={{ display: 'flex', gap: spacing.sm }}>
-                  {[
-                    { value: 'early', label: 'Early Stage', desc: 'Focus on the problem, audience & assumptions' },
-                    { value: 'late',  label: 'Late Stage',  desc: 'Focus on traction, metrics & execution proof' },
-                  ].map(({ value, label, desc }) => {
-                    const active = stage === value
-                    return (
-                      <button
-                        key={value}
-                        onClick={() => setStage(value)}
-                        style={{
-                          flex: 1,
-                          padding: `${spacing.sm}px ${spacing.md}px`,
-                          borderRadius: radius.md,
-                          border: `1px solid ${active ? colors.accent : colors.border}`,
-                          background: active ? 'rgba(230,57,70,0.08)' : colors.bgSurface,
-                          color: active ? colors.accent : colors.textFaint,
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                          transition: 'border-color 0.15s, color 0.15s, background 0.15s',
-                        }}
-                      >
-                        <div style={{ ...mono, fontSize: '0.7rem', marginBottom: 2 }}>{label}</div>
-                        <div style={{ fontSize: '0.75rem', color: active ? colors.textMuted : colors.textFaint, fontFamily: 'inherit' }}>{desc}</div>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: spacing.md, marginTop: spacing.lg, alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: spacing.md, marginTop: spacing.lg, alignItems: 'center', justifyContent: 'center' }}>
                 <PrimaryBtn onClick={handleStartDebate}>
                   <span>🎤</span> START DEBATE
                 </PrimaryBtn>
