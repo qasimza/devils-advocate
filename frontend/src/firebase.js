@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth, signInAnonymously, signInWithPopup, GoogleAuthProvider, GithubAuthProvider, onAuthStateChanged, signOut } from 'firebase/auth'
-import { getStorage, ref, uploadBytesResumable, deleteObject, listAll, getMetadata } from 'firebase/storage'
+import { getStorage, ref, uploadBytesResumable, deleteObject, listAll, getMetadata, getDownloadURL } from 'firebase/storage'
 
 
 const firebaseConfig = {
@@ -35,3 +35,4 @@ export const githubProvider = new GithubAuthProvider()
 export { ref, uploadBytesResumable, deleteObject, listAll, getMetadata }
 
 export { signInAnonymously, signInWithPopup, onAuthStateChanged, signOut }
+export { getDownloadURL }

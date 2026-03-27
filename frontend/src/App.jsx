@@ -192,7 +192,7 @@ function HoldToEndButton({ onConfirm }) {
       ) : (
         <>
           <span>⏹</span>
-          <span>END & EVALUATE</span>
+          <span>END & EVALUATE (Hold)</span>
         </>
       )}
     </button>
@@ -777,7 +777,7 @@ export default function App() {
                       margin: '3px 0 0', fontSize: font.xs,
                       color: colors.textGhost, ...serif, lineHeight: 1.4,
                     }}>
-                      Anonymized transcript used for academic study only.
+                      Your transcript, claim data, and audio may be stored and used for academic research. Toggle off to discard all data at session end.
                     </p>
                   </div>
                 </div>
