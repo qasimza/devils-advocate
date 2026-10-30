@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "devils-advocate-488918"
-  }
+    "default": "devils-advocate-488918",
+    "production": "devils-advocate-z-1793328009"
+  },
+  "targets": {},
+  "etags": {}
 }
