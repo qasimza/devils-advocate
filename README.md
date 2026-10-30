@@ -6,7 +6,7 @@ Built for the **Google Gemini Live Agent Challenge** and for **UIUC CS 568 (User
 
 ## For Judges
 
-- **Live demo:** [devils-advocate-488918.web.app](https://devils-advocate-488918.web.app/)
+- **Live demo:** [https://devils-advocate-z-1793328009.web.app/](https://devils-advocate-z-1793328009.web.app/)
 - **Architecture PDF:** [docs/arch_diagram.pdf](docs/arch_diagram.pdf)
 - **Best quick demo path:** enter a startup idea, debate the live agent, then review the scorecard and post-debate report
 
@@ -83,7 +83,7 @@ For the Gemini Live Agent Challenge / Devpost submission, this repo supports:
 - Public code repository with reproducible local setup instructions.
 - Clear description of Gemini, Firebase, and Google Cloud usage.
 - Architecture diagram: [docs/arch_diagram.pdf](docs/arch_diagram.pdf).
-- Public demo link: [devils-advocate-488918.web.app](https://devils-advocate-488918.web.app/).
+- Public demo link: [https://devils-advocate-z-1793328009.web.app/](https://devils-advocate-z-1793328009.web.app/).
 - Demo video showing the real live-agent workflow, not mockups.
 - Proof-of-deployment recording showing the deployed frontend plus the Google Cloud backend or service view.
 
@@ -231,7 +231,7 @@ Recommended manual checks:
 - Start a debate with a typed claim only.
 - Start a debate with uploaded documents only.
 - Complete a full session and verify transcript, claim tracker, judge scorecard, share flow, and PDF export.
-- Compare behavior against the deployed site at [devils-advocate-488918.web.app](https://devils-advocate-488918.web.app/).
+- Compare behavior against the deployed site at [https://devils-advocate-z-1793328009.web.app/](https://devils-advocate-z-1793328009.web.app/).
 
 ## Deployment Notes
 
@@ -239,7 +239,7 @@ Recommended manual checks:
 
 The current team deployment used for demos and submission materials is:
 
-- [https://devils-advocate-488918.web.app/](https://devils-advocate-488918.web.app/)
+- [https://devils-advocate-z-1793328009.web.app/](https://devils-advocate-z-1793328009.web.app/)
 
 ### Backend Deployment
 
